@@ -2,7 +2,8 @@
 
 from LegadoParser2.RuleType import RuleType, getRuleType2, getRuleType
 from LegadoParser2.Tokenize2 import tokenizer, tokenizerInner
-from LegadoParser2.RuleDefault.RuleDefaultEfficient2 import parseIndex, getElementsXpath, getStringsXpath
+from LegadoParser2.RuleDefault.RuleDefaultEfficient2 import parseIndex, getElementsXpath
+from LegadoParser2.RuleDefault.EndRule import EndRuleXpath
 from lxml.etree import _Element, tostring, XPath, XPathSyntaxError
 from cssselect import SelectorSyntaxError, ExpressionError
 from LegadoParser2.RuleJsonPath.RuleJsonPath import getJsonPath
@@ -10,6 +11,7 @@ from jsonpath_ng.exceptions import JSONPathError
 import re
 from LegadoParser2 import GSON
 from LegadoParser2.config import DEBUG_MODE
+from copy import deepcopy
 
 
 def packet(rules):
@@ -257,21 +259,11 @@ def compileRule(rules):
                 pass
             try:
                 if cursor + 1 == length or rules[cursor + 1] in {'&&', '%%', '||'}:
-                    endPath = getStringsXpath(rules[cursor])
-                    if endPath:
-                        ruleObj['endXpath'] = XPath(endPath)
+                    ruleObj['endXpath'] = EndRuleXpath.get(rules[cursor])
 
             except XPathSyntaxError:
                 pass
-            except SelectorSyntaxError:
-                pass
-            except ExpressionError as e:
-                if DEBUG_MODE:
-                    print(f'不支持的选择器：{e}')
-                    raise
-                pass
-            except IndexError:
-                pass
+
             try:
                 if length == 1:
                     ruleObj['jsonPath'] = getJsonPath(rules[cursor])
@@ -313,6 +305,28 @@ def trimBookSource(bS):
             trimBookSource(bS[k])
 
 
+def compileBookSource(bookSource, specify=''):
+    bookSource = deepcopy(bookSource)
+    trimBookSource(bookSource)
+    ruleGroupNames = ('ruleSearch', 'ruleBookInfo', 'ruleToc', 'ruleContent')
+    excludeRuleSet = {'checkKeyWord', 'canReName',
+                      'webJs', 'imageStyle', 'sourceRegex', 'payAction'}
+    if specify in bookSource:
+        for key in bookSource[specify]:
+            if key in excludeRuleSet:
+                continue
+            if bookSource[specify][key]:
+                bookSource[specify][key] = getRuleObj(bookSource[specify][key])
+    else:
+        for ruleGroupName in ruleGroupNames:
+            for key in bookSource[ruleGroupName]:
+                if key in excludeRuleSet:
+                    continue
+                if bookSource[ruleGroupName][key]:
+                    bookSource[ruleGroupName][key] = getRuleObj(bookSource[ruleGroupName][key])
+    return bookSource
+
+
 # print(packet(tokenizer('[property=\"og:description\"]@content##(^|[。！？]+[”」）】]?)##$1<br>')))
 # print(packet(tokenizer('@js:\nvar doc = org.jsoup.Jsoup.parse(result)\nvar url = \"https://www.imiaobige.com\"+doc.select(\"a\").get(0).attr(\"href\")\nvar all = org.jsoup.Jsoup.parse(java.ajax(url))\nresult = all.select(\"#bookimg\").select(\"img\").attr(\"src\")')))
 # print(packet(tokenizer('#readerlists li a<js></js>123{{}}132{{}}')))
@@ -338,3 +352,5 @@ def trimBookSource(bS):
 # pprint.pprint(getRuleObj("👁️{{@.count@text}}"))
 
 # print(json.dumps(getRuleObj("👁️{{@.count@text}}"), indent=4, cls=RuleObjectEncoder))
+
+# print(packet(tokenizer('.content tr tr.1@text##(.*作者：)(.*)(发布时间：.*)##$2')))

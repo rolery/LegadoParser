@@ -14,34 +14,44 @@
 
 Windows下需要Python 3.9版本，其他Python版本的部分依赖安装需要自行编译
 
-调试模式开关在[config.py](https://github.com/821938089/LegadoParser/blob/main/LegadoParser2/config.py)中
-
 ## 安装
 
 ### Windows （Python 3.9）
 
 ```bash
-git clone https://github.com/821938089/LegadoParser
-cd LegadoParser
-pip install -r requirements_win.txt
+pip install git+https://github.com/821938089/LegadoParser#egg=LegadoParser
 ```
 
 ### Linux/WSL （Python 3.8+）
 
 ```bash
-git clone https://github.com/821938089/LegadoParser
-cd LegadoParser
 sudo apt-get install libxml2 libxml2-dev
-pip install -r requirements_linux.txt
+pip install git+https://github.com/821938089/LegadoParser#egg=LegadoParser
 ```
 
-### OCR可选安装
+### OCR字体识别可选安装
 
-~~~bash
-pip install -r requirements_ocr.txt
-~~~
+```bash
+pip install git+https://github.com/821938089/LegadoParser#egg=LegadoParser[ocr]
+```
 
-安装后使用webView获取章节内容会自动检测是否需要OCR
+安装后使用webView获取章节内容会自动检测是否需要OCR字体识别
+
+局限性较大，无必要不推荐安装
+
+### 升级
+
+```bash
+# 就是卸载重装
+pip uninstall LegadoParser -y
+pip install git+https://github.com/821938089/LegadoParser#egg=LegadoParser
+```
+
+### 卸载
+
+```bash
+pip uninstall LegadoParser -y
+```
 
 ## 基础用法
 
@@ -50,36 +60,54 @@ pip install -r requirements_ocr.txt
 ## 高级API
 
 ```python
+from LegadoParser2.RulePacket import compileBookSource
+
+def compileBookSource(bookSource, specify=''):
+"""
+书源规则编译函数
+
+参数 - 描述 - 类型
+
+bookSource - 书源json - dict
+specify - 只编译指定规则组 - str
+
+
+specify 可选 ('ruleSearch', 'ruleBookInfo', 'ruleToc', 'ruleContent')
+
+"""
+```
+
+```python
 from LegadoParser2.Search import search
 
-def search(bS, key, page=1):
+def search(compiledBookSource, key, page=1):
 """
 搜索函数
 
 参数 - 描述 - 类型
 
-bS - 书源 - dict
+compiledBookSource- 经过compileBookSource函数编译的书源规则 - dict
 key - 搜索 - str
 page - 页数 - int
 
-返回值 list[dict]
 
-注意：如果搜索后直接跳转到了详情页，将调用parseBookInfo获取信息，字典key注意差异。
-书籍Url的key将从bookUrl变为tocUrl。
+注意：如果搜索后直接跳转到了详情页，将调用parseBookInfo获取信息。
+
 """
 ```
 
 ```python
 from LegadoParser2.BookInfo import getBookInfo
 
-def getBookInfo(bS, url):
+def getBookInfo(compiledBookSource, url, variables):
 """
 获取详情信息
 
 参数 - 描述 - 类型
 
-bS - 书源 - dict
+compiledBookSource- 经过compileBookSource函数编译的书源规则 - dict
 url - search函数中返回的 bookUrl 或 tocUrl - str
+variables - search函数中返回的variables - dict
 
 """
 ```
@@ -87,30 +115,33 @@ url - search函数中返回的 bookUrl 或 tocUrl - str
 ```python
 from LegadoParser2.ChapterList import getChapterList
 
-def getChapterList(bS, url):
+def getChapterList(compiledBookSource, url, variables):
 """
 获取章节列表
 
 参数 - 描述 - 类型
 
-bS - 书源 - dict
+compiledBookSource- 经过compileBookSource函数编译的书源规则 - dict
 url - getBookInfo函数中返回的tocUrl - str
+variables - getBookInfo函数中返回的variables - dict
 
 """
 ```
 
 ```python
-from LegadoParser2.Chapter import getChapterContent
+compileBookSourcefrom LegadoParser2.Chapter import getChapterContent
 
-def getChapterContent(bS, url, nextChapterUrl=''):
+def getChapterContent(compiledBookSource, url, variables, nextChapterUrl=''):
 """
 获取章节内容
 
 参数 - 描述 - 类型
 
-bS - 书源 - dict
+compiledBookSource- 经过compileBookSource函数编译的书源规则 - dict
 url - getChapterList函数中返回的url - str
 nextChapterUrl - 下一章的url - str
+variables - getChapterList函数中返回的variables - dict
+
 """
 ```
 
@@ -118,7 +149,8 @@ nextChapterUrl - 下一章的url - str
 from LegadoParser2.RuleEval import getElements, getString, getStrings
 from LegadoParser2.RulePacket import getRuleObj
 
-# 基础API
+# 基础API，根据规则提取数据
+# 详细参数见源码
 ```
 
 ## 示例结果
@@ -159,3 +191,7 @@ from LegadoParser2.RulePacket import getRuleObj
 略
 --------------------结束--------------------
 ```
+
+## [License](./LICENSE)
+
+[![GLWTPL](https://img.shields.io/badge/GLWT-Public_License-red.svg)](https://github.com/me-shaon/GLWTPL)

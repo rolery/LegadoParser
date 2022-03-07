@@ -1,4 +1,7 @@
 import json
+import threading
+import re
+
 from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 
 from LegadoParser2 import GSON
@@ -8,12 +11,18 @@ from LegadoParser2.RuleUrl.BodyType import Body
 from LegadoParser2.RuleUrl.UrlEval import getUrlRuleObj
 from LegadoParser2.RuleEval import getString
 from LegadoParser2.webview import WebView
-from LegadoParser2.config import DEBUG_MODE, USER_AGENT
+from LegadoParser2.config import DEBUG_MODE, USER_AGENT, CAN_USE_WEBVIEW
+
+
+_lock = threading.Lock()
+
+needCompileRegex = re.compile(r'@js:|<js>|{{', re.IGNORECASE)
 
 
 def parseUrl(ruleUrl, evalJs, baseUrl='', headers=''):
     urlObj = {
         'url': '',
+        'rawUrl': ruleUrl,  # = baseUrl
         'method': 'GET',
         'body': '',
         'headers': {},
@@ -21,14 +30,17 @@ def parseUrl(ruleUrl, evalJs, baseUrl='', headers=''):
         'webView': False,
         'webJs': '',
         'allFontFaceUrl': None,
-        'webViewSession': None
+        'type': None
+        # finalUrl = redirectUrl
     }
     bodyType = None
-    ruleObj = getUrlRuleObj(ruleUrl)
+    if needCompileRegex.search(ruleUrl):
+        ruleObj = getUrlRuleObj(ruleUrl)
+    else:
+        ruleObj = None
 
-    # print(ruleObj)
-
-    if len(ruleObj) == 1 and ruleObj[0]['type'] != RuleType.DefaultOrEnd:
+    # if len(ruleObj) == 1 and ruleObj[0]['type'] != RuleType.DefaultOrEnd:
+    if ruleObj:
         _url = getString(ruleUrl, ruleObj, evalJs)
     else:
         _url = ruleUrl
@@ -49,7 +61,7 @@ def parseUrl(ruleUrl, evalJs, baseUrl='', headers=''):
         if headers:
             try:
                 urlObj['headers'].update(GSON.parse(headers))
-            except:
+            except Exception:
                 pass
 
         if isinstance(urlObj['body'], dict):
@@ -71,7 +83,7 @@ def parseUrl(ruleUrl, evalJs, baseUrl='', headers=''):
         if headers:
             try:
                 urlObj['headers'].update(GSON.parse(headers))
-            except:
+            except Exception:
                 pass
         url = urljoin(baseUrl, _url)
     urlObj['url'] = url
@@ -95,20 +107,21 @@ def setDefaultHeaders(headers, bodyType):
             headers['Content-Type'] = 'text/xml'
 
 
-def urljoin(base, url):
-    # HttpCon = getLeftStr(base, '://')
-    # AddRoot = getMiddleStr(base, '://', '/')
-    if url.startswith('http'):
-        return url
-    HttpCon, AddRoot = base.split('://')
-    AddRoot = AddRoot.split('/')[0]
-    if url[:2] == '//':
-        return HttpCon + ':' + url
-    elif url[:1] == '/':
-        return HttpCon + '://' + AddRoot + url
+def urljoin(baseUrl, relativeUrl):
+    relativeUrl = relativeUrl.strip()
+    if relativeUrl == '#':
+        return baseUrl
+    if relativeUrl.startswith('http'):
+        return relativeUrl
+    scheme, address = baseUrl.split('://')
+    address = address.split('/')[0]
+    if relativeUrl[:2] == '//':
+        return scheme + ':' + relativeUrl
+    elif relativeUrl[:1] == '/':
+        return scheme + '://' + address + relativeUrl
     else:
-        pos = base.rfind('/')
-        return base[:pos + 1] + url
+        pos = baseUrl.rfind('/')
+        return baseUrl[:pos + 1] + relativeUrl
 
 
 def getContent(urlObj):
@@ -127,17 +140,18 @@ def getContent(urlObj):
     userAgent = urlObj['headers']['User-Agent']
     respone = None
 
-    if urlObj['webView'] and (bodyType is None or bodyType == Body.FORM):
-        if not urlObj.get('webViewSession'):
-            webView = WebView(userAgent)
-            urlObj['webViewSession'] = webView
-        else:
-            webView = urlObj['webViewSession']
-        if urlObj['method'] == 'GET':
-            content = webView.getResponseByUrl(url, urlObj['webJs'])
-        elif urlObj['method'] == 'POST':
-            content = webView.getResponseByPost(url, body, charset, urlObj['webJs'])
-        urlObj['allFontFaceUrl'] = webView.allFontFaceUrl
+    if CAN_USE_WEBVIEW and urlObj['webView'] and (bodyType is None or bodyType == Body.FORM) and urlObj['type'] is None:
+        with _lock:
+            webView = WebView()
+            currentUrl = url
+
+            if urlObj['method'] == 'GET':
+                content, allFontFaceUrl, currentUrl = webView.getResponseByUrl(
+                    url, urlObj['webJs'], userAgent)
+                urlObj['allFontFaceUrl'] = allFontFaceUrl
+            elif urlObj['method'] == 'POST':
+                content = webView.getResponseByPost(url, body, charset, urlObj['webJs'])
+
     else:
         if body and bodyType == Body.FORM:
             body = urlencode(parse_qs(body, keep_blank_values=True), doseq=True, encoding=charset)
@@ -145,11 +159,14 @@ def getContent(urlObj):
             body = body.encode(charset)
         content, __, respone = req(url, header=urlObj['headers'],
                                    method=method, post_data=body)
+        if urlObj['type']:
+            # zip数据转换为hex
+            content = respone.content.hex()
 
     if respone:
         urlObj['finalurl'] = str(respone.url)
     elif urlObj['webView']:
-        urlObj['finalurl'] = webView.currentUrl
+        urlObj['finalurl'] = currentUrl
 
     if urlObj['allFontFaceUrl']:
         for fontFaceUrl in urlObj['allFontFaceUrl']:
