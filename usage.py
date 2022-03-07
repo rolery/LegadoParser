@@ -81,9 +81,12 @@ def get(key,startChapter=0):
         if result:
             for r in result:
                 if r["name"]==key:
+                    lock=threading.Lock()
+                    lock.acquire()
                     hit=r
                     src["using"]=True
                     print("finded:",r)
+                    lock.release()
                     break
         
         if not hit:
