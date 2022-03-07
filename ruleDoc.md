@@ -248,6 +248,9 @@
        * `java.put`与 `java.get`
 
          只能用于js中，在js中无法使用@get
+       * 【实现细节差异】
+
+         * 变量无法跨函数存取，例如 `ruleSearch`中的变量无法在 `ruleBookInfo`中使用。
      * `{{}}`与 `{}`规则
 
        * 在搜索URL与发现URL中的 `{{}}`
@@ -296,21 +299,17 @@
          }
          strToMd5By32('123')
          ```
-       * 变量
+       * ~~变量~~（不支持）
 
-         【实现细节差异】
-
-         绿色为支持，红色为不支持。
-
-         ```diff
-         +baseUrl 变量-当前url,String
-         +result 变量-上一步的结果
-         -book 变量-书籍类,方法见 io.legado.app.data.entities.Book
-         -cookie 变量-cookie操作类,方法见 io.legado.app.help.http.CookieStore
-         -cache 变量-缓存操作类,方法见 io.legado.app.help.CacheManager
-         -chapter 变量-当前目录类,方法见 io.legado.app.data.entities.BookChapter
-         -title 变量-当前标题,String
-         -src 内容,源码
+         ```
+         baseUrl 变量-当前url,String
+         result 变量-上一步的结果
+         book 变量-书籍类,方法见 io.legado.app.data.entities.Book
+         cookie 变量-cookie操作类,方法见 io.legado.app.help.http.CookieStore
+         cache 变量-缓存操作类,方法见 io.legado.app.help.CacheManager
+         chapter 变量-当前目录类,方法见 io.legado.app.data.entities.BookChapter
+         title 变量-当前标题,String
+         src 内容,源码
          ```
        * 下面是一些常用的函数，详见[JsExtensions.kt](https://github.com/gedoor/legado/blob/master/app/src/main/java/io/legado/app/help/JsExtensions.kt)
 
@@ -560,7 +559,7 @@
 
   * 只能使用正则之AllInOne或者js
   * 正则之AllInOne必须以 `:`开头
-  * js的返回值需要是json对象，例：
+  * ~js的返回值需要是json对象，例：~
 
     ```
     <js>
@@ -579,7 +578,7 @@
     </js>
     ```
 
-    此时，书名规则填 `a`，作者规则填 `b`，分类规则填 `c`，字数规则填 `d`，最新章节规则填 `e`，简介规则 `f`，封面规则填 `g`，目录URL规则填 `h`
+    ~此时，书名规则填 `a`，作者规则填 `b`，分类规则填 `c`，字数规则填 `d`，最新章节规则填 `e`，简介规则 `f`，封面规则填 `g`，目录URL规则填 `h`~
 * 书名规则(name)
 * 作者规则(author)
 * 分类规则(kind)

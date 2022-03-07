@@ -1,4 +1,3 @@
-import html
 
 from LegadoParser2.RuleType import RuleType
 from LegadoParser2.RuleDefault.RuleDefaultEfficient2 import defaultProcessor
@@ -9,12 +8,8 @@ from LegadoParser2.config import DEBUG_MODE
 from lxml.etree import _Element, tostring
 from copy import deepcopy
 
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from LegadoParser2.RuleJs.JS import EvalJs
 
-
-def getElements(content, rulesObj, evalJs: 'EvalJs'):
+def getElements(content, rulesObj, evalJs):
     if content and content[0] in {'{', ']'} and content[-1] in {'}', ']'}:
         # 当内容是json是默认规则为JsonPath
         for rule in rulesObj:
@@ -38,7 +33,7 @@ def getElements(content, rulesObj, evalJs: 'EvalJs'):
                 content = regexProcessor(content, rule)
             elif rule['type'] == RuleType.Order:
                 reverse = rule['preProcess']['reverse']
-    except Exception:
+    except:
         if DEBUG_MODE:
             raise
         else:
@@ -74,7 +69,7 @@ def getStrings(content, rulesObj, evalJs, **kwargs):
                 content = formatProcrssor(content, rule, evalJs)
             elif rule['type'] == RuleType.Regex:
                 content = regexProcessor(content, rule, **kwargs)
-    except Exception:
+    except:
         if DEBUG_MODE:
             raise
         else:
@@ -87,18 +82,19 @@ def getStrings(content, rulesObj, evalJs, **kwargs):
 
 
 def getString(content, rulesObj, evalJs, **kwargs):
-
-    result = getStrings(content, rulesObj, evalJs, **kwargs)
-    result = '\n'.join(filter(None, result))
-
-    result = html.unescape(result)
+    replaceRegexRuleObj = []  # 在regexProcessor中使用
+    result = getStrings(content, rulesObj, evalJs,
+                        replaceRegexRuleObj=replaceRegexRuleObj, **kwargs)
+    result = '\n'.join(result).strip()
+    if replaceRegexRuleObj:
+        result = regexProcessor(result, replaceRegexRuleObj[0])[0]
     return result
 
 
-def putProcessor(content, rule, evalJs: 'EvalJs'):
+def putProcessor(content, rule, evalJs):
     compiledPutRules = rule['preProcess']['compiledPutRules']
     for key, r in compiledPutRules.items():
-        evalJs.putVariable(key, getString(content, r, evalJs))
+        evalJs.putVAR(key, getString(content, r, evalJs))
 
 
 def jsProcessor(content, evalJs, rule, **kwargs):
@@ -137,17 +133,16 @@ def jsProcessor(content, evalJs, rule, **kwargs):
         return [result]
 
 
-def formatProcrssor(content, rule, evalJs: 'EvalJs'):
+def formatProcrssor(content, rule, evalJs):
     # 处理 {{ }}  @get:{ } {$. } $1
 
     joinSymbol = rule['joinSymbol']
     crossJoin = rule['crossJoin']
+    lastResultList = []  # 上一个规则组的结果
     preProcessSubRules = rule['preProcess']['subRules']
     subRules = rule['subRules']
-
-    lastResultList = []  # 上一个规则组的结果
     resultList = []
-    if content and isinstance(content, list) and isinstance(content[-1], tuple):
+    if isinstance(content, list) and isinstance(content[-1], tuple):
         lastResultList = content[:-1]
         joinSymbol, content = content[-1]
         if lastResultList and joinSymbol == '||':
@@ -179,11 +174,10 @@ def formatProcrssor(content, rule, evalJs: 'EvalJs'):
             rawRules[jsonRules[idx][1]] = getString(content, rs, evalJs)
             rawRules[jsonRules[idx][1] - 1] = ''
             rawRules[jsonRules[idx][1] + 1] = ''
-        if isinstance(content, tuple):
-            for idx, r in enumerate(regexRules):
-                rawRules[regexRules[idx][1]] = content[int(r[0][1]) - 1]
+        for idx, r in enumerate(regexRules):
+            rawRules[regexRules[idx][1]] = content[int(r[0][1]) - 1]
         for idx, r in enumerate(getRules):
-            rawRules[getRules[idx][1]] = evalJs.getVariable(r[0])
+            rawRules[getRules[idx][1]] = evalJs.getVAR(r[0])
             rawRules[getRules[idx][1] - 1] = ''
             rawRules[getRules[idx][1] + 1] = ''
         resultList.append(''.join(rawRules))

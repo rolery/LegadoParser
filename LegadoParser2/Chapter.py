@@ -3,6 +3,7 @@ import sys
 from LegadoParser2.FormatUtils import Fmt
 from LegadoParser2.RuleUrl.Url import parseUrl, getContent, urljoin
 from LegadoParser2.RuleJs.JS import EvalJs
+from LegadoParser2.RulePacket import getRuleObj, trimBookSource
 from lxml.etree import HTML
 from LegadoParser2.RuleEval import getElements, getString, getStrings
 from concurrent.futures import ThreadPoolExecutor
@@ -17,35 +18,41 @@ else:
     from html5_parser import parse
 
 
-def getChapterContent(compiledBookSource, url, variables, nextChapterUrl=''):
-    # trimBookSource(compiledBookSource)
-    ruleContent = compiledBookSource['ruleContent']
-    evalJs = EvalJs(compiledBookSource)
-    evalJs.loadVariables(variables)
-    if compiledBookSource.get('header'):
-        headers = compiledBookSource['header']
+def getChapterContent(bS, url, nextChapterUrl=''):
+    trimBookSource(bS)
+    ruleContent = bS['ruleContent']
+    evalJs = EvalJs(bS)
+    if bS.get('header', None):
+        headers = bS['header']
     else:
         headers = ''
     urlObj = parseUrl(url, evalJs, headers=headers)
-    if ruleContent.get('webJs'):
+    # print(urlObj)
+    if ruleContent.get('webJs', None):
         urlObj['webJs'] = ruleContent['webJs']
     evalJs.set('baseUrl', url)
     content, __ = getContent(urlObj)
-    return parseContent(compiledBookSource, urlObj, content.strip(), evalJs, nextChapterUrl=nextChapterUrl)
+    return parseContent(bS, urlObj, content.strip(), evalJs, nextChapterUrl=nextChapterUrl)
 
 
 def parseContent(bS, urlObj, content, evalJs, **kwargs):
     ruleContent = bS['ruleContent']
-    nextChapterUrl = kwargs.get('nextChapterUrl')
-    # if not ruleContent:
-    #     return {}
+    nextChapterUrl = kwargs.get('nextChapterUrl', None)
+    if not ruleContent:
+        return {}
+    if ruleContent.get('content', None):
+        rulesContent = getRuleObj(ruleContent['content'])
+    if ruleContent.get('nextContentUrl', None):
+        rulesNextContentUrl = getRuleObj(ruleContent['nextContentUrl'])
+    if ruleContent.get('replaceRegex', None):
+        rulesReplaceRegex = getRuleObj(ruleContent['replaceRegex'])
 
     _content = content
 
     if content and content.startswith('<') and content.endswith('>'):
         try:
             content = parse(content, sanitize_names=False)
-        except Exception:
+        except:
             content = HTML(content)
     elif content and content.startswith('{') and content.endswith('}'):
         content = json.loads(content)
@@ -54,13 +61,13 @@ def parseContent(bS, urlObj, content, evalJs, **kwargs):
 
     def parseCt(content):
 
-        if ruleContent.get('content'):
+        if ruleContent.get('content', None):
             chapterContent['content'] += getString(
-                content, ruleContent['content'], evalJs, rawContent=_content)
+                content, rulesContent, evalJs, rawContent=_content)
             chapterContent['content'] += '\n'
-        if ruleContent.get('nextContentUrl'):
+        if ruleContent.get('nextContentUrl', None):
             nextContentUrls = getStrings(
-                content, ruleContent['nextContentUrl'], evalJs, rawContent=_content)
+                content, rulesNextContentUrl, evalJs, rawContent=_content)
         else:
             nextContentUrls = None
 
@@ -74,9 +81,11 @@ def parseContent(bS, urlObj, content, evalJs, **kwargs):
             allNextUrls = []
             if nextChapterUrl:
                 allNextUrls.append(nextChapterUrl)
+            webViewSession = urlObj.get('webViewSession')
             while nextContentUrls and nextUrl not in allNextUrls:
                 allNextUrls.append(nextUrl)
-                urlObj = parseUrl(nextUrl, evalJs, urlObj['finalurl'])
+                urlObj = parseUrl(nextUrl, evalJs)
+                urlObj['webViewSession'] = webViewSession
                 content, __ = getContent(urlObj)
                 nextContentUrls = parseCt(content)
                 if nextContentUrls:
@@ -84,18 +93,18 @@ def parseContent(bS, urlObj, content, evalJs, **kwargs):
                 else:
                     break
         else:
-            contents = fetchContents(nextContentUrls, urlObj)
+            contents = fetchContents(nextContentUrls)
             for content, __ in contents:
                 parseCt(content)
 
     if chapterContent['content']:
         chapterContent['content'] = Fmt.html(chapterContent['content'])
 
-    if ruleContent.get('replaceRegex'):
+    if ruleContent.get('replaceRegex', None):
         chapterContent['content'] = getString(
-            chapterContent['content'], ruleContent['replaceRegex'], evalJs, rawContent=_content)
+            chapterContent['content'], rulesReplaceRegex, evalJs, rawContent=_content)
     try:
-        if checkPUA(chapterContent['content']):
+        if urlObj['webViewSession'] and checkPUA(chapterContent['content']):
             if DEBUG_MODE:
                 print('parseContent 发现PUA字符，尝试OCR修复')
             PUAChars = collectPUAChars(chapterContent['content'])
@@ -103,20 +112,20 @@ def parseContent(bS, urlObj, content, evalJs, **kwargs):
                 chapterContent['content'], urlObj['allFontFaceUrl'], PUAChars)
     except NameError:
         pass
-    except Exception:
+    except:
         if DEBUG_MODE:
             print('parseContent OCR修复出错，已取消进行')
 
     return chapterContent
 
 
-def fetchContents(urls, urlObject):
+def fetchContents(urls):
     evalJs = EvalJs({})
     executor = ThreadPoolExecutor(max_workers=8)
     tasks = []
     results = []
     for u in urls:
-        urlObj = parseUrl(u, evalJs, urlObject['finalurl'])
+        urlObj = parseUrl(u, evalJs)
         task = executor.submit(getContent, urlObj)
         tasks.append(task)
     for task in tasks:

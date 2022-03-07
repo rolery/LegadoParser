@@ -33,7 +33,7 @@ class Fmt():
                 result = f'{words/10000.0:.1f}万字'
             else:
                 result = f'{words}字'
-        except Exception:
+        except:
             result = text
 
         return result
@@ -41,8 +41,7 @@ class Fmt():
     @classmethod
     def html(cls, text, otherRegex=otherHtmlRegex):
         text = unicodedata.normalize('NFC', text)
-        text = text.replace('\ufeff', '')
-        text = text.replace('\u200b', '')
+        text = text.replace(u'\ufeff', '')
         text = cls.spaceRegex.sub(' ', text)
         text = cls.noPrintRegex.sub('', text)
         text = cls.wrapHtmlRegex.sub('\n', text)

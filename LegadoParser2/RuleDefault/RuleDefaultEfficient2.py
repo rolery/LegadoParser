@@ -21,7 +21,7 @@ def getElementsByDefault(content, compileRule):
     if isinstance(content, str):
         try:
             content = parse(content, sanitize_names=False)
-        except Exception:
+        except:
             content = HTML(content)
     elif isinstance(content, list):
         _content = []
@@ -65,11 +65,42 @@ def getElementsByDefault(content, compileRule):
     return content
 
 
+# def getStringsByDefault(content, compileRule):
+
+#     if isinstance(content, list):
+#         _content = []
+#         for c in content:
+#             _content += getStringsByDefault(c, compileRule)
+#         return _content
+#     rule = compileRule['rule']
+#     Xpath = compileRule['endXpath']
+#     textRegex = re.compile('\n\s+')
+#     if rule == 'text':
+
+#         # return [getText(content)]
+#         return [''.join([textRegex.sub('', i) for i in Xpath(content)])]
+#         # return [tostring(content, method='text', encoding='utf-8').decode('utf-8')]
+#     elif rule == 'textNodes':
+
+#         return ['\n'.join([i.strip() for i in Xpath(content)])]
+#     elif rule == 'ownText':
+#         # return [getOwnText(content)]
+#         return [''.join(Xpath(content))]
+#     elif rule == 'html':
+#         for i in Xpath(content):
+#             i.getparent().remove(i)
+#         return [tostring(content, encoding='utf-8', method='html', with_tail=False).decode('utf-8')]
+#     elif rule == 'all':
+#         return [tostring(content, encoding='utf-8', method='html', with_tail=False).decode('utf-8')]
+#     else:
+#         return Xpath(content)
+
+
 def getStringsByDefault(content, compileRule):
     if isinstance(content, str):
         try:
             content = parse(content, sanitize_names=False)
-        except Exception:
+        except:
             content = HTML(content)
     if not isinstance(content, list):
         content = [content]
@@ -265,7 +296,14 @@ def getStringsXpath(rule):
     elif rule == 'html':
         return './/script|.//style'
     else:
-        return f'./@{rule}'
+        return f'.//@{rule}'
+    # print(parseIndex('a.b! 1:10 :2'))
+    # print(parseIndex('a.b. 1:10:2'))
+    # print(parseIndex('a.b[!1:10:2]'))
+    # print(parseIndex('a.b[!1:10:2,!3]'))
+    # print(parseIndex('a.b[!1:10 :2 ,!3,!4]'))
+    # print(parseIndex('[!1:10 :2 ,!3,!4]'))
+    # print(parseIndex('!1'))
 
 
 def defaultProcessor(content, ruleObj, hasEndRule=False):
@@ -275,13 +313,18 @@ def defaultProcessor(content, ruleObj, hasEndRule=False):
     crossJoin = ruleObj['crossJoin']
     lastResultList = []  # 上一个规则组的结果
     resultList = []
-    if isinstance(content, list) and content and isinstance(content[-1], tuple):
+    if isinstance(content, list) and isinstance(content[-1], tuple):
         lastResultList = content[:-1]
         joinSymbol, content = content[-1]
         if lastResultList and joinSymbol == '||':
             return lastResultList
 
     _content = content
+
+    # if hasEndRule == False:
+    #     getFunction = getElementsByDefault
+    # else:
+    #     getFunction = getStringsByDefault
 
     for subRule in subRules:
         for compileRule in subRule:

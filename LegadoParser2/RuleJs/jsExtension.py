@@ -1,9 +1,10 @@
 from LegadoParser2.HttpRequset2 import req
 from LegadoParser2.config import USER_AGENT, DEBUG_MODE
-from LegadoParser2.RulePacket import getRuleObj
 from fs.memoryfs import MemoryFS
 from fs.zipfs import ZipFS
 from charset_normalizer import from_bytes
+from LegadoParser2.RulePacket import getRuleObj
+from LegadoParser2.RuleEval import getString, getStrings
 
 
 def getZipStringContent(url, path):
@@ -13,11 +14,8 @@ def getZipStringContent(url, path):
     mem_fs = MemoryFS()
     with mem_fs.open('book.zip', 'wb+') as mem_zip_file:
         try:
-            if url.startswith('http'):
-                req(url, header=headers, file_obj=mem_zip_file)
-            else:
-                mem_zip_file.write(bytes.fromhex(url))
-        except Exception:
+            req(url, header=headers, file_obj=mem_zip_file)
+        except:
             if DEBUG_MODE:
                 print('getZipStringContent 文件下载失败')
             return ''
@@ -42,7 +40,6 @@ _MAXCACHE = 512
 
 
 def getStringJs(content, evalJs, rule, isUrl=False):
-    from LegadoParser2.RuleEval import getString, getStrings
     rulesObj = None
     try:
         rulesObj = _cache[rule]

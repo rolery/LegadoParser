@@ -69,6 +69,8 @@ def regexProcessor(content, rule, **kwargs):
     regex = rule['preProcess']['body']['regex']
     replaceFirst = rule['preProcess']['body']['replaceFirst']
 
+    replaceRegexRuleObj = kwargs.get('replaceRegexRuleObj', None)
+
     if regexType == 'allInOne':
         return reObj.findall(content)
     elif regexType == 'onlyOne':
@@ -84,6 +86,10 @@ def regexProcessor(content, rule, **kwargs):
     elif regexType == 'replace':
         if not isinstance(content, list):
             content = [content]
+
+        if replaceRegexRuleObj is not None:
+            replaceRegexRuleObj.append(rule)
+            return content
 
         content = list(filter(lambda x: isinstance(x, str), content))
         if replaceFirst:
