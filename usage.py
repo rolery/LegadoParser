@@ -30,6 +30,8 @@ def init():
 
 def get(key,startChapter=0):
     bS_index=0
+    if os.path.exists("books/"+key+".txt"):
+        os.remove("books/"+key+".txt")
     
     for srcIndex in range(len(bookSource)):
 
@@ -114,6 +116,6 @@ def get(key,startChapter=0):
 if __name__ == '__main__':
     init()
     # get("疯巫妖的实验日志")
-    pool=ThreadPoolExecutor(max_workers=16)
+    pool=ThreadPoolExecutor(max_workers=32)
     all_task=[pool.submit(get,(key)) for key in names]
     wait(all_task,return_when=ALL_COMPLETED)
